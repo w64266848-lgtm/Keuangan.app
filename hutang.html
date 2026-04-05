@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Keuangan Pro - Hutang</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+/* ===== GENERAL ===== */
+body{
+  font-family:'Poppins',sans-serif;
+  background: linear-gradient(120deg,#f6f8fa,#e9f0f7);
+  padding:20px;
+  transition:.3s;
+}
+h2{
+  text-align:center;
+  color:#333;
+}
+
+/* ===== CARD ===== */
+.card{
+  background:#fff;
+  padding:20px;
+  margin:15px 0;
+  border-radius:15px;
+  box-shadow:0 5px 15px rgba(0,0,0,0.1);
+  transition:.3s;
+}
+.card:hover{
+  box-shadow:0 8px 25px rgba(0,0,0,0.15);
+}
+
+/* ===== INPUT & BUTTON ===== */
+input,select{padding:12px;margin:8px 0;width:100%;border-radius:10px;border:1px solid #ccc;outline:none;transition:.3s;}
+input:focus,select:focus{border-color:#4CAF50;}
+button{padding:10px;margin:5px 0;border:none;border-radius:10px;cursor:pointer;transition:.3s;font-weight:600;}
+button.save{background:#4CAF50;color:#fff;width:100%;}
+button.save:hover{background:#45a049;}
+button.paid{background:#2196F3;color:#fff;}
+button.paid:hover{background:#1976d2;}
+button.hapus{background:#f44336;color:#fff;}
+button.hapus:hover{background:#d32f2f;}
+button.export{background:#FF9800;color:#fff;}
+button.export:hover{background:#fb8c00;}
+
+/* ===== LIST ===== */
+.list-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin:8px 0;
+  flex-wrap:wrap;
+}
+.list-item span.status-belum{color:#e53935;font-weight:bold;}
+.list-item span.status-lunas{color:#43a047;font-weight:bold;}
+
+/* ===== FILTER ===== */
+.filter{
+  display:flex;
+  gap:10px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.filter button{
+  flex:1;
+  border-radius:25px;
+  font-weight:500;
+}
+.filter input[type="date"]{
+  flex:1;
+}
+
+/* ===== BACK BUTTON ===== */
+.back-btn{
+  background:#607d8b;
+  color:#fff;
+  padding:10px 20px;
+  border-radius:12px;
+  margin-bottom:15px;
+}
+.back-btn:hover{background:#455a64;}
+</style>
+</head>
+<body>
+
+<h2>Hutang / Piutang</h2>
+<button class="back-btn" onclick="window.location='dashboard.html'">⬅ Kembali</button>
+
+<!-- FORM INPUT HUTANG/PIUTANG -->
+<div class="card">
+  <input id="namaHutang" placeholder="Nama">
+  <input type="number" id="jumlahHutang" placeholder="Jumlah">
+  <select id="jenisHutang">
+    <option value="hutang">Saya Ngutang</option>
+    <option value="piutang">Orang Ngutang</option>
+  </select>
+  <button class="save" onclick="saveHutang()">Simpan</button>
+</div>
+
+<!-- FILTER STATUS & TANGGAL -->
+<div class="card filter">
+  <button onclick="setFilter('all')">Semua</button>
+  <button onclick="setFilter('belum')">Belum Bayar</button>
+  <button onclick="setFilter('lunas')">Sudah Bayar</button>
+  <input type="date" id="tanggalAwal" onchange="renderHutang()" title="Tanggal Awal">
+  <input type="date" id="tanggalAkhir" onchange="renderHutang()" title="Tanggal Akhir">
+  <button class="export" onclick="exportExcel()">Export Excel</button>
+</div>
+
+<!-- LIST HUTANG/PIUTANG -->
+<div class="card" id="listHutang"></div>
+
+<script>
+// Cek login
+if(!localStorage.getItem("user")) window.location="login.html";
+
+// Filter default
+let filterStatus = 'all';
+function setFilter(status){
+  filterStatus = status;
+  renderHutang();
+}
+
+// Ambil data dari localStorage
+function getHutang() {
+  return JSON.parse(localStorage.getItem("hutang")) || [];
+}
+
+// Simpan hutang/piutang
+function saveHutang() {
+  let nama = document.getElementById("namaHutang").value.trim();
+  let jumlah = parseInt(document.getElementById("jumlahHutang").value);
+  let jenis = document.getElementById("jenisHutang").value;
+
+  if(!nama || !jumlah) return alert("Nama dan jumlah wajib diisi!");
+
+  let tanggal = new Date().toISOString().slice(0,10);
+  let d = getHutang();
+  d.push({nama, jumlah, jenis, lunas: false, tanggal});
+  localStorage.setItem("hutang", JSON.stringify(d));
+  renderHutang();
+
+  // reset input
+  document.getElementById("namaHutang").value = "";
+  document.getElementById("jumlahHutang").value = "";
+}
+
+// Tandai lunas
+function tandaiLunas(index){
+  let d = getHutang();
+  d[index].lunas = true;
+  localStorage.setItem("hutang", JSON.stringify(d));
+  renderHutang();
+}
+
+// Hapus data
+function hapusHutang(index){
+  let d = getHutang();
+  d.splice(index,1);
+  localStorage.setItem("hutang", JSON.stringify(d));
+  renderHutang();
+}
+
+// Render list
+function renderHutang() {
+  let d = getHutang();
+  let html = "";
+
+  // ambil filter tanggal
+  let tanggalAwal = document.getElementById("tanggalAwal").value;
+  let tanggalAkhir = document.getElementById("tanggalAkhir").value;
+
+  d.forEach((h,i)=>{
+    // filter status
+    if(filterStatus === 'belum' && h.lunas) return;
+    if(filterStatus === 'lunas' && !h.lunas) return;
+
+    // filter tanggal
+    if(tanggalAwal && h.tanggal < tanggalAwal) return;
+    if(tanggalAkhir && h.tanggal > tanggalAkhir) return;
+
+    html += `
+      <div class="list-item">
+        <span>${h.tanggal} - ${h.nama} - ${h.jenis} - Rp ${h.jumlah.toLocaleString()}</span>
+        ${h.lunas?
+          '<span class="status-lunas">Sudah Bayar</span> <button class="hapus" onclick="hapusHutang('+i+')">Hapus</button>'
+          :
+          '<span class="status-belum">Belum Bayar</span> <button class="paid" onclick="tandaiLunas('+i+')">Sudah Bayar</button>'
+        }
+      </div>
+    `;
+  });
+  document.getElementById("listHutang").innerHTML = html;
+}
+
+// Export Excel/CSV (filter juga berlaku)
+function exportExcel(){
+  let d = getHutang();
+  if(d.length === 0) return alert("Tidak ada data untuk diexport!");
+
+  // ambil filter status & tanggal
+  let tanggalAwal = document.getElementById("tanggalAwal").value;
+  let tanggalAkhir = document.getElementById("tanggalAkhir").value;
+
+  let filtered = d.filter(h => {
+    if(filterStatus === 'belum' && h.lunas) return false;
+    if(filterStatus === 'lunas' && !h.lunas) return false;
+    if(tanggalAwal && h.tanggal < tanggalAwal) return false;
+    if(tanggalAkhir && h.tanggal > tanggalAkhir) return false;
+    return true;
+  });
+
+  if(filtered.length === 0) return alert("Tidak ada data untuk diexport sesuai filter!");
+
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Tanggal,Nama,Jenis,Jumlah,Status\n";
+  filtered.forEach(h=>{
+    let status = h.lunas ? "Sudah Bayar" : "Belum Bayar";
+    csvContent += `${h.tanggal},${h.nama},${h.jenis},${h.jumlah},${status}\n`;
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  let tanggalSekarang = new Date().toISOString().slice(0,10);
+  link.setAttribute("download", `Hutang_Piutang_${tanggalSekarang}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Render awal
+renderHutang();
+</script>
+
+</body>
+</html>

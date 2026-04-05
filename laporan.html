@@ -1,0 +1,126 @@
+<!DOCTYPE html><html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laporan Keuangan PRO</title>
+<style>
+body{font-family:'Poppins',sans-serif;background:#f4f6f9;margin:0;padding:20px;color:#333;}
+h2{text-align:center;color:#4CAF50;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;}
+th,td{padding:10px;text-align:center;border:1px solid #ccc;}
+th{background:#4CAF50;color:#fff;}
+tr:nth-child(even){background:#f9f9f9;}
+tfoot td{font-weight:700;background:#e8f5e9;}
+button{padding:6px 10px;margin:2px;border:none;border-radius:5px;background:#4CAF50;color:#fff;cursor:pointer;}
+button:hover{background:#45a049;}
+.danger{background:#e53935;}
+.filter-bar{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:15px;}
+.filter-bar input, .filter-bar select{padding:5px;border-radius:5px;border:1px solid #ccc;}
+</style>
+</head>
+<body>
+<h2>Laporan Keuangan PRO</h2><div class="filter-bar">
+  <button onclick="window.location='dashboard.html'">⬅ Kembali</button>
+  <select id="filterTipe" onchange="renderTable()">
+    <option value="">Semua Tipe</option>
+    <option value="Pemasukan">Pemasukan</option>
+    <option value="Pengeluaran">Pengeluaran</option>
+  </select>
+  <input type="text" id="filterKategori" placeholder="Kategori" oninput="renderTable()">
+  <input type="text" id="filterAkun" placeholder="Akun" oninput="renderTable()">
+  <input type="text" id="filterKeterangan" placeholder="Keterangan" oninput="renderTable()">
+  <input type="date" id="filterTanggalMulai" onchange="renderTable()">
+  <input type="date" id="filterTanggalSelesai" onchange="renderTable()">
+</div><table>
+<thead>
+<tr>
+<th>Tanggal</th>
+<th>Tipe</th>
+<th>Kategori</th>
+<th>Keterangan</th>
+<th>Akun</th>
+<th>Jumlah</th>
+<th>Aksi</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+<tfoot>
+<tr><td colspan="6">Total Pemasukan</td><td id="totalPemasukan">Rp 0</td></tr>
+<tr><td colspan="6">Total Pengeluaran</td><td id="totalPengeluaran">Rp 0</td></tr>
+<tr><td colspan="6">Saldo</td><td id="saldo">Rp 0</td></tr>
+</tfoot>
+</table><script>
+if(!localStorage.getItem("user")) window.location="login.html";
+
+function rp(n){return "Rp "+(n||0).toLocaleString("id-ID");}
+function getData(){let u=localStorage.getItem("user");return JSON.parse(localStorage.getItem("data_"+u))||[];}
+function saveData(d){let u=localStorage.getItem("user");localStorage.setItem("data_"+u,JSON.stringify(d));}
+
+function renderTable(){
+ let data=getData(),html="",p=0,k=0;
+ let fT=filterTipe.value;
+ let fK=filterKategori.value.toLowerCase();
+ let fA=filterAkun.value.toLowerCase();
+ let fKet=filterKeterangan.value.toLowerCase();
+ let t1=filterTanggalMulai.value;
+ let t2=filterTanggalSelesai.value;
+
+ data.forEach((d,i)=>{
+  if((!fT||d.tipe===fT)&&
+     (!fK||d.kategori.toLowerCase().includes(fK))&&
+     (!fA||d.akun.toLowerCase().includes(fA))&&
+     (!fKet||(d.keterangan||"").toLowerCase().includes(fKet))&&
+     (!t1||d.tanggal>=t1)&&(!t2||d.tanggal<=t2)){
+
+   html+=`<tr>
+    <td>${d.tanggal}</td>
+    <td>${d.tipe}</td>
+    <td>${d.kategori}</td>
+    <td>${d.keterangan||'-'}</td>
+    <td>${d.akun}</td>
+    <td>${rp(d.jumlah)}</td>
+    <td>
+      <button onclick="editData(${i})">Edit</button>
+      <button class='danger' onclick="hapusData(${i})">Hapus</button>
+    </td>
+   </tr>`;
+
+   if(d.tipe==='Pemasukan')p+=d.jumlah;
+   else k+=d.jumlah;
+  }
+ });
+
+ tbody.innerHTML=html;
+ totalPemasukan.innerText=rp(p);
+ totalPengeluaran.innerText=rp(k);
+ saldo.innerText=rp(p-k);
+}
+
+function hapusData(i){
+ let data=getData();
+ if(confirm("Hapus transaksi ini?")){
+  data.splice(i,1);
+  saveData(data);
+  renderTable();
+ }
+}
+
+function editData(i){
+ let data=getData();
+ let d=data[i];
+ let t=prompt("Tanggal:",d.tanggal);
+ let j=prompt("Jumlah:",d.jumlah);
+ let k=prompt("Kategori:",d.kategori);
+ let a=prompt("Akun:",d.akun);
+ let ket=prompt("Keterangan:",d.keterangan||"");
+
+ if(t&&j){
+  data[i]={...d,tanggal:t,jumlah:parseFloat(j),kategori:k,akun:a,keterangan:ket};
+  saveData(data);
+  renderTable();
+ }
+}
+
+renderTable();
+</script></body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keuangan Pro - Target</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+body{
+    font-family:'Poppins', sans-serif;
+    background:#f4f6f9;
+    padding:20px;
+}
+h2, h3{
+    text-align:center;
+    margin-bottom:15px;
+}
+input, select, button{
+    padding:10px;
+    margin:5px 0;
+    width:100%;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:14px;
+}
+button{
+    cursor:pointer;
+    border:none;
+    background:#4CAF50;
+    color:#fff;
+    font-weight:600;
+    transition:0.3s;
+}
+button:hover{background:#45a049;}
+button.delete{background:#f44336;}
+button.delete:hover{background:#e53935;}
+button.edit{background:#FF9800;}
+button.edit:hover{background:#fb8c00;}
+button.export{background:#2196F3;}
+button.export:hover{background:#1976D2;}
+button.back{background:#607d8b;}
+button.back:hover{background:#546e7a;}
+.card{
+    background:#fff;
+    padding:20px;
+    margin:10px 0;
+    border-radius:15px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+.target-item{
+    background:#f9f9f9;
+    padding:15px;
+    margin-bottom:15px;
+    border-radius:12px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+.target-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+.target-info{
+    margin-bottom:10px;
+}
+.progress-bar{
+    background:#e0e0e0;
+    width:100%;
+    border-radius:10px;
+    height:22px;
+    margin:8px 0;
+    overflow:hidden;
+}
+.progress-fill{
+    height:100%;
+    border-radius:10px;
+    text-align:center;
+    color:#fff;
+    line-height:22px;
+    font-weight:bold;
+    transition:0.4s;
+}
+.badge{
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:12px;
+    font-size:12px;
+    font-weight:600;
+    margin-left:5px;
+}
+.actions{
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+}
+</style>
+</head>
+<body>
+
+<h2>Target Tabungan</h2>
+
+<!-- Tombol Kembali ke Dashboard -->
+<button class="back" onclick="window.location='dashboard.html'">← Kembali ke Dashboard</button>
+
+<!-- Form Tambah / Edit Target -->
+<div class="card">
+  <input id="namaTarget" placeholder="Nama Target">
+  <input type="number" id="jumlahTarget" placeholder="Jumlah Target">
+  <input type="date" id="tanggalTarget" placeholder="Tanggal Selesai (Opsional)">
+  <select id="kategoriTarget">
+      <option value="">Umum</option>
+      <option value="Liburan">Liburan</option>
+      <option value="Gadget">Gadget</option>
+      <option value="Dana Darurat">Dana Darurat</option>
+  </select>
+  <div class="actions">
+      <button onclick="saveTarget()">Simpan / Update</button>
+      <button class="export" onclick="exportExcel()">Export</button>
+  </div>
+</div>
+
+<!-- Filter Tanggal -->
+<div class="card">
+  <h3>Filter Target Berdasarkan Tanggal Dibuat</h3>
+  <input type="date" id="filterStart" placeholder="Tanggal Mulai">
+  <input type="date" id="filterEnd" placeholder="Tanggal Akhir">
+  <div class="actions">
+    <button onclick="renderTarget()">Filter</button>
+    <button class="back" onclick="resetFilter()">Reset Filter</button>
+  </div>
+</div>
+
+<!-- List Target -->
+<div id="listTarget"></div>
+
+<script>
+let user = localStorage.getItem("user");
+if(!user) window.location="login.html";
+
+let editIndex = -1;
+
+// Ambil target dari localStorage
+function getTarget(){
+    return JSON.parse(localStorage.getItem("target_"+user)) || [];
+}
+
+// Ambil saldo dari data transaksi dashboard
+function getSaldo(){
+    let d = JSON.parse(localStorage.getItem("data_"+user)) || [];
+    let s = 0;
+    d.forEach(x => s += x.tipe.toLowerCase()=="pemasukan"? Number(x.jumlah) : -Number(x.jumlah));
+    return s;
+}
+
+// Simpan target baru atau update
+function saveTarget(){
+    let d = getTarget();
+    let nama = document.getElementById("namaTarget").value.trim();
+    let jumlah = parseInt(document.getElementById("jumlahTarget").value);
+    let tanggalSelesai = document.getElementById("tanggalTarget").value || null;
+    let kategori = document.getElementById("kategoriTarget").value || "Umum";
+
+    if(!nama || !jumlah || jumlah <=0){
+        alert("Isi nama dan nominal target dengan benar!");
+        return;
+    }
+
+    let tanggal = new Date().toLocaleDateString();
+
+    if(editIndex >=0){
+        d[editIndex] = {nama, jumlah, tanggal, tanggalSelesai, kategori};
+        editIndex = -1;
+    } else {
+        d.push({nama, jumlah, tanggal, tanggalSelesai, kategori});
+    }
+
+    localStorage.setItem("target_"+user, JSON.stringify(d));
+    renderTarget();
+
+    // reset input
+    document.getElementById("namaTarget").value = "";
+    document.getElementById("jumlahTarget").value = "";
+    document.getElementById("tanggalTarget").value = "";
+    document.getElementById("kategoriTarget").value = "";
+}
+
+// Hapus target
+function deleteTarget(index){
+    let d = getTarget();
+    d.splice(index,1);
+    localStorage.setItem("target_"+user, JSON.stringify(d));
+    renderTarget();
+}
+
+// Edit target
+function editTarget(index){
+    let t = getTarget()[index];
+    document.getElementById("namaTarget").value = t.nama;
+    document.getElementById("jumlahTarget").value = t.jumlah;
+    document.getElementById("tanggalTarget").value = t.tanggalSelesai || "";
+    document.getElementById("kategoriTarget").value = t.kategori || "";
+    editIndex = index;
+}
+
+// Reset Filter
+function resetFilter(){
+    document.getElementById("filterStart").value = "";
+    document.getElementById("filterEnd").value = "";
+    renderTarget();
+}
+
+// Render semua target dan progres
+function renderTarget(){
+    let d = getTarget();
+    let saldo = Math.max(0, getSaldo());
+    let html = "";
+
+    // Ambil filter tanggal
+    let start = document.getElementById("filterStart").value ? new Date(document.getElementById("filterStart").value) : null;
+    let end = document.getElementById("filterEnd").value ? new Date(document.getElementById("filterEnd").value) : null;
+
+    if(d.length===0){
+        html="<p style='text-align:center'>Belum ada target tabungan.</p>";
+    } else {
+        d.forEach((t,i)=>{
+            let tTanggal = new Date(t.tanggal);
+            if( (start && tTanggal < start) || (end && tTanggal > end) ) return;
+
+            let p = Math.min(100,(saldo / t.jumlah)*100).toFixed(1);
+            let color = p>=100?"#4CAF50":p>=80?"#2196F3":p>=50?"orange":"red";
+            let sisaNominal = Math.max(0, t.jumlah - saldo);
+            let sisaHari = t.tanggalSelesai ? Math.ceil((new Date(t.tanggalSelesai)-new Date())/(1000*60*60*24)) : null;
+            let badgeHari="";
+            if(sisaHari!=null){
+                let badgeColor = sisaHari<0?"red":sisaHari<3?"red":sisaHari<8?"orange":"green";
+                badgeHari=`<span class="badge" style="background:${badgeColor}">${sisaHari>=0?sisaHari+' hari tersisa':'Lewat deadline'}</span>`;
+            }
+
+            html+=`
+            <div class="target-item">
+                <div class="target-header">
+                  <strong>${t.nama}</strong>
+                  <span class="badge" style="background:#607d8b">${t.kategori}</span>
+                </div>
+                <div class="target-info">
+                  Rp ${t.jumlah.toLocaleString()}<br>
+                  Dibuat: ${t.tanggal} ${t.tanggalSelesai? "| Selesai: "+t.tanggalSelesai : ""} ${badgeHari}
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width:${p}%;background:${color}">
+                      ${p}% - Sisa Rp ${sisaNominal.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="edit" onclick="editTarget(${i})">Edit</button>
+                  <button class="delete" onclick="deleteTarget(${i})">Hapus</button>
+                </div>
+            </div>
+            `;
+        });
+    }
+
+    document.getElementById("listTarget").innerHTML = html;
+}
+
+// Export ke CSV
+function exportExcel(){
+    let targets = getTarget();
+    if(targets.length===0){ alert("Belum ada data untuk diexport."); return; }
+
+    let csv="Nama Target,Nominal,Tanggal Dibuat,Tanggal Selesai,Kategori,Tercapai (%)\n";
+    let saldo = Math.max(0, getSaldo());
+
+    targets.forEach(t=>{
+        let p = Math.min(100,(saldo / t.jumlah)*100).toFixed(1);
+        let tSelesai = t.tanggalSelesai?t.tanggalSelesai:"";
+        let kategori = t.kategori?t.kategori:"Umum";
+        csv+=`"${t.nama}",${t.jumlah},"${t.tanggal}","${tSelesai}","${kategori}",${p}\n`;
+    });
+
+    let blob = new Blob([csv],{type:'text/csv'});
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "target_tabungan.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Render awal
+renderTarget();
+</script>
+</body>
+</html>

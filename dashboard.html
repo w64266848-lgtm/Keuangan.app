@@ -1,0 +1,144 @@
+<!DOCTYPE html><html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keuangan Pro - Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f6f9;margin:0;padding:20px;transition:0.3s;color:#333;}
+.dark{background:#121212;color:#f1f1f1;}
+.dark .card{background:#1e1e1e;color:#f1f1f1;}
+h2{margin-bottom:20px;text-align:center;color:#4CAF50;}
+.card{background:#fff;padding:20px;margin:10px 0;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.05);}
+.dark .card{box-shadow:0 4px 12px rgba(0,0,0,0.3);} 
+.user-info{display:flex;align-items:center;gap:15px;}
+.user-info img{border-radius:50%;width:60px;height:60px;}
+.stats{display:flex;flex-wrap:wrap;gap:15px;justify-content:space-around;}
+.stats .card{flex:1 1 150px;text-align:center;}
+form{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0;}
+form input, form select{flex:1 1 150px;padding:12px;border:1px solid #ccc;border-radius:8px;}
+form button{flex:1 1 100%;padding:12px;background:#4CAF50;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
+.top{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:20px 0;}
+.top button{padding:12px 18px;border:none;border-radius:8px;cursor:pointer;background:#4CAF50;color:#fff;}
+.top button.danger{background:#e53935;}
+#kategoriPopup{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);}
+#kategoriPopup div{background:#fff;padding:20px;border-radius:12px;max-width:350px;margin:80px auto;}
+canvas{max-width:100%;margin:20px auto;display:block;}
+</style>
+</head>
+<body>
+<h2>Dashboard Keuangan</h2><div class="card user-info">
+  <img id="avatar" src="">
+  <div>
+    <b id="namaUser"></b><br>
+    <small>Selamat datang kembali 👋</small>
+  </div>
+</div><div class="stats">
+  <div class="card">Pemasukan<br><b id="masuk">0</b></div>
+  <div class="card">Pengeluaran<br><b id="keluar">0</b></div>
+  <div class="card">Saldo<br><b id="saldo">0</b></div>
+</div><form onsubmit="save(event)">
+  <input type="date" id="tanggal" required>
+  <input type="text" id="jumlah" placeholder="Jumlah" required>
+  <select id="tipe">
+    <option value="Pemasukan">Pemasukan</option>
+    <option value="Pengeluaran">Pengeluaran</option>
+  </select>
+  <select id="kategori"></select>
+  <select id="akun"></select>
+  <input type="text" id="keterangan" placeholder="Keterangan (contoh: bensin)">
+  <button type="submit">Simpan Transaksi</button>
+</form><canvas id="chart"></canvas>
+
+<div class="top">
+  <button onclick="window.location='laporan.html'">📊 Laporan</button>
+  <button onclick="window.location='target.html'">🎯 Target</button>
+  <button onclick="window.location='hutang.html'">💳 Hutang</button>
+  <button onclick="openKategoriPopup()">🗂 Kategori</button>
+  <button onclick="toggleDark()">🌙 Dark Mode</button>
+  <button class="danger" onclick="resetData()">Reset</button>
+  <button onclick="logout()">Logout</button>
+</div><div id="kategoriPopup">
+  <div>
+    <h3>Kategori</h3>
+    <input id="kategoriBaru" placeholder="Nama kategori baru">
+    <button onclick="tambahKategori()">Tambah</button>
+    <div id="listKategori"></div>
+    <button onclick="closeKategoriPopup()">Tutup</button>
+  </div>
+</div><script>
+if(!localStorage.getItem("user")) window.location="login.html";
+let chart;
+function rp(n){return "Rp "+(n||0).toLocaleString("id-ID");}
+function cleanNumber(str){return parseFloat(String(str).replace(/[^0-9.-]+/g,""))||0;}
+
+function getData(){let u=localStorage.getItem("user");return JSON.parse(localStorage.getItem("data_"+u))||[];}
+function saveData(d){let u=localStorage.getItem("user");localStorage.setItem("data_"+u,JSON.stringify(d));}
+
+const defaultKeterangan={
+  "Transport":"Bensin",
+  "Makanan":"Makan harian",
+  "Gaji":"Gaji bulanan",
+  "Hiburan":"Nongkrong"
+};
+
+document.addEventListener("change",e=>{
+ if(e.target.id==="kategori"){
+  keterangan.value=defaultKeterangan[e.target.value]||"";
+ }
+});
+
+function save(e){
+ e.preventDefault();
+ let data=getData();
+ let item={
+  tanggal:tanggal.value,
+  jumlah:cleanNumber(jumlah.value),
+  tipe:tipe.value,
+  kategori:kategori.value,
+  akun:akun.value,
+  keterangan:keterangan.value
+ };
+ data.push(item);
+ saveData(data);
+ render();
+ e.target.reset();
+}
+
+function render(){
+ let user=localStorage.getItem("user");
+ namaUser.innerText=user;
+ avatar.src="https://ui-avatars.com/api/?name="+user;
+ let d=getData(),m=0,k=0;
+ d.forEach(x=>{if(x.tipe=="Pemasukan")m+=x.jumlah;else k+=x.jumlah;});
+ masuk.innerText=rp(m);
+ keluar.innerText=rp(k);
+ saldo.innerText=rp(m-k);
+ if(chart) chart.destroy();
+ chart=new Chart(chartCanvas,{type:'doughnut',data:{labels:['Pemasukan','Pengeluaran'],datasets:[{data:[m,k],backgroundColor:['#4CAF50','#e53935']}]}});
+ loadAkunDropdown();
+ loadKategoriDropdown();
+}
+
+function getAkunList(){return JSON.parse(localStorage.getItem("akunList"))||["Dana","BRI","Jago","SeaBank","Cash"];}
+function loadAkunDropdown(){akun.innerHTML="";getAkunList().forEach(a=>akun.innerHTML+=`<option>${a}</option>`);} 
+
+function getKategoriList(){return JSON.parse(localStorage.getItem("kategoriList"))||["Makanan","Transport","Gaji","Hiburan"];}
+function loadKategoriDropdown(){kategori.innerHTML="";getKategoriList().forEach(k=>kategori.innerHTML+=`<option>${k}</option>`);} 
+
+function openKategoriPopup(){kategoriPopup.style.display="block";renderKategoriList();}
+function closeKategoriPopup(){kategoriPopup.style.display="none";}
+function tambahKategori(){let list=getKategoriList();let val=kategoriBaru.value.trim();if(!val)return alert("Isi kategori!");if(list.includes(val))return alert("Sudah ada!");list.push(val);localStorage.setItem("kategoriList",JSON.stringify(list));renderKategoriList();loadKategoriDropdown();kategoriBaru.value="";}
+function renderKategoriList(){let list=getKategoriList();listKategori.innerHTML="";list.forEach((k,i)=>{listKategori.innerHTML+=`${k} <button onclick='hapusKategori(${i})'>Hapus</button><br>`});}
+function hapusKategori(i){let list=getKategoriList();list.splice(i,1);localStorage.setItem("kategoriList",JSON.stringify(list));renderKategoriList();loadKategoriDropdown();}
+
+function toggleDark(){document.body.classList.toggle("dark");}
+function resetData(){let u=localStorage.getItem("user");localStorage.removeItem("data_"+u);render();}
+function logout(){localStorage.removeItem("user");location="login.html";}
+
+const chartCanvas=document.getElementById("chart");
+render();
+</script></body>
+</html>
